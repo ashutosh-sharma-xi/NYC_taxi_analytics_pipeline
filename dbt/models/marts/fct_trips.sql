@@ -4,14 +4,8 @@
 -- run we keep only rows newer than the latest pickup already loaded. The qualify
 -- dedupes any repeated surrogate keys within a batch, guaranteeing trip_id unique
 -- (so the unique test holds). For a full 2023 batch, run `dbt run --full-refresh`.
-
-{{
-  config(
-    materialized = 'incremental',
-    unique_key = 'trip_id',
-    on_schema_change = 'sync_all_columns'
-  )
-}}
+-- Materialization config (incremental, unique_key, tags, enable flag) is in
+-- models/marts/schema.yml; the incremental WHERE/qualify stay here in SQL.
 
 with enriched as (
     select * from {{ ref('int_trips_enriched') }}

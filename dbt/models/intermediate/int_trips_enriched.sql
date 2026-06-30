@@ -2,6 +2,11 @@
 -- the data-quality filters. Invalid records are dropped here so the marts only
 -- ever see clean, enriched trips.
 --
+-- Materialised as an INCREMENTAL table (delete+insert on trip_id): each run only
+-- processes newly-loaded rows (watermark on _loaded_at), and delete+insert removes
+-- any existing rows with the same trip_id before inserting — so reloading a month
+-- or a cross-file duplicate trip never double-counts.
+--
 -- Filters: trip_distance > 0, fare_amount > 0, passenger_count > 0, and
 -- trip_duration_minutes within the parametrised [min, max] range (default 1..180).
 
@@ -42,3 +47,7 @@ where t.trip_distance > 0
   and t.passenger_count > 0
   and t.trip_duration_minutes >= {{ var('min_trip_duration_minutes') }}
   and t.trip_duration_minutes <= {{ var('max_trip_duration_minutes') }}
+{% if is_incremental() %}
+  -- only process rows loaded since the last run (ingestion stamps _loaded_at)
+  and t._loaded_at > (select max(_loaded_at) from {{ this }})
+{% endif %}

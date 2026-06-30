@@ -1,0 +1,23 @@
+version: 2
+
+models:
+  - name: int_trips_enriched
+    description: >
+      Valid, zone-enriched trips. Incremental table using delete+insert on trip_id,
+      watermarked on _loaded_at so reruns only process newly-loaded rows. The DQ
+      filters (distance/fare/passengers/duration) are applied here.
+    config:
+      materialized: incremental
+      incremental_strategy: delete+insert
+      unique_key: trip_id
+      on_schema_change: sync_all_columns
+      tags: ['intermediate']
+      enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
+    columns:
+      - name: trip_id
+        description: "Surrogate key; delete+insert dedupes it across runs."
+        tests:
+          - not_null
+      - name: pickup_location_id
+        tests:
+          - not_null

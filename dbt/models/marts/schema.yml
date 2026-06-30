@@ -3,6 +3,12 @@ version: 2
 models:
   - name: fct_trips
     description: "Fact table of all valid, enriched taxi trips. Grain = one trip. Incremental on pickup_datetime."
+    config:
+      materialized: incremental
+      unique_key: trip_id
+      on_schema_change: sync_all_columns
+      tags: ['marts']
+      enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
     columns:
       - name: trip_id
         description: "Surrogate primary key, deduped in this model."
@@ -28,6 +34,10 @@ models:
 
   - name: dim_zones
     description: "Taxi zone dimension. One row per zone."
+    config:
+      materialized: table
+      tags: ['marts']
+      enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
     columns:
       - name: location_id
         tests:
@@ -36,6 +46,10 @@ models:
 
   - name: agg_daily_revenue
     description: "Daily revenue aggregation."
+    config:
+      materialized: table
+      tags: ['marts']
+      enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
     columns:
       - name: revenue_date
         tests:
@@ -44,6 +58,10 @@ models:
 
   - name: agg_zone_performance
     description: "Per pickup-zone performance with revenue rank and high-volume flag."
+    config:
+      materialized: table
+      tags: ['marts']
+      enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
     columns:
       - name: pickup_location_id
         tests:

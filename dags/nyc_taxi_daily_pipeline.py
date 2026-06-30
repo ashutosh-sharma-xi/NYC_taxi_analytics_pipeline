@@ -16,6 +16,7 @@ to its month's file.
 from __future__ import annotations
 
 import os
+import sys
 import urllib.request
 from datetime import datetime, timedelta
 
@@ -26,6 +27,11 @@ from airflow.operators.python import PythonOperator
 PROJECT_DIR = os.environ.get("NYC_TAXI_PROJECT_DIR", "/opt/airflow/nyc_taxi_analytics_pipeline")
 DBT_DIR = os.path.join(PROJECT_DIR, "dbt")
 CLOUDFRONT = "https://d37ci6vzurychx.cloudfront.net/trip-data"
+
+# Make the repo's utils/ importable inside Airflow workers.
+if PROJECT_DIR not in sys.path:
+    sys.path.insert(0, PROJECT_DIR)
+from utils.notifications import airflow_failure_callback, send_success  # noqa: E402
 
 # Snowflake creds flow through the environment to dbt and to the Python tasks.
 SNOWFLAKE_ENV = {
@@ -46,6 +52,8 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
     "email_on_failure": True,
     "email": os.environ.get("ALERT_EMAIL", "data-alerts@example.com").split(","),
+    # Slack alert on ANY task failure, with a link to that task's log.
+    "on_failure_callback": airflow_failure_callback,
 }
 
 
@@ -95,9 +103,16 @@ def notify_success(**context):
 
     if row:
         trips, revenue = row
+        metrics = {"Trips": f"{trips:,}", "Fare revenue": f"${revenue:,.2f}"}
         print(f"SUCCESS {ds}: {trips:,} trips, ${revenue:,.2f} fare revenue")
     else:
+        metrics = {"Note": "pipeline completed, no rows for this date"}
         print(f"SUCCESS {ds}: pipeline completed (no rows for this date)")
+
+    # Link to this run so the success message is clickable in Slack.
+    ti = context.get("task_instance")
+    run_url = getattr(ti, "log_url", None)
+    send_success(dag_id=context["dag"].dag_id, run_date=ds, metrics=metrics, run_url=run_url)
 
 
 with DAG(

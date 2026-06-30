@@ -3,6 +3,10 @@ version: 2
 models:
   - name: stg_yellow_trips
     description: "Cleaned/cast Yellow Taxi trips, 1:1 with the raw source, with a surrogate trip_id and trip_duration_minutes."
+    config:
+      materialized: view
+      tags: ['staging']
+      enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
     columns:
       - name: trip_id
         description: "Surrogate key (md5 of natural columns). May repeat for genuine duplicate trips; deduped in fct_trips."
@@ -16,6 +20,10 @@ models:
 
   - name: stg_taxi_zones
     description: "Taxi zone dimension from the seed: location_id -> borough / zone / service_zone."
+    config:
+      materialized: view
+      tags: ['staging']
+      enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
     columns:
       - name: location_id
         tests:

@@ -17,16 +17,23 @@ vars:
   min_trip_duration_minutes: 1
   max_trip_duration_minutes: 180
 
+# Master switch for the dbt build, read from the MODELS_ENABLED environment
+# variable (default 'true'). Every model's `enabled:` in its schema.yml keys off
+# it, so one env var skips ALL models — e.g. on the daily ingestion-only run:
+#   MODELS_ENABLED=false dbt build      (bash)   -> models skipped
+#   $env:MODELS_ENABLED='false'; dbt build (PowerShell)
+# Leave it unset (or 'true') for the weekly full build.
+
+# Per-model materialization, strategy, tags and the enable flag now live in each
+# layer's schema.yml (single place to read a model's config). Only the output
+# schema per layer is set here.
 models:
   nyc_taxi:
     staging:
-      +materialized: view
       +schema: staging
     intermediate:
-      +materialized: view
       +schema: intermediate
     marts:
-      +materialized: table
       +schema: marts
 
 seeds:

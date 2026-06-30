@@ -9,7 +9,8 @@ ingestion into Snowflake → dbt transforms → tests → Airflow orchestration.
   `NYC_TAXI.RAW.raw_yellow_tripdata` with a `_loaded_at` column. No transforms.
   Parameterised by `MONTHS` env var (one-off 2023 batch or recurring load).
 - **`dbt/`** — all modeling + data-quality tests.
-  - `models/staging` → `models/intermediate` → `models/marts` (view → view → table).
+  - `models/staging` (view) → `models/intermediate` (incremental, delete+insert on
+    `trip_id`, watermark on `_loaded_at`) → `models/marts` (table; `fct_trips` incremental).
   - Zone lookup is a **seed** (`seeds/taxi_zone_lookup.csv`), not ingested.
   - `models/staging/sources.yml` defines source **freshness** on `_loaded_at`.
   - `fct_trips` is **incremental** (keyed on surrogate `trip_id`).
