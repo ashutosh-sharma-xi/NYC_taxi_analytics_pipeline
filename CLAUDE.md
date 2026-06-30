@@ -18,16 +18,16 @@ ingestion into Snowflake → dbt transforms → tests → Airflow orchestration.
 - **`dags/nyc_taxi_daily_pipeline.py`** — Airflow DAG, daily 02:00 UTC:
   `check_source_freshness → run_dbt_{staging,intermediate,marts} → run_dbt_tests
   → notify_success`. `retries=2`, `email_on_failure`, `catchup=True`.
-- **`queries/`** — ad-hoc analytical SQL against the `*_marts` schema.
+- **`analysis/`** — ad-hoc analytical SQL (Snowflake) against `*_marts` / `RAW`.
+- **`queries/`** — assessment query set (top zones, hourly, gap analysis).
 - **`spark/`** — (bonus) PySpark historical processor.
-- **`notebooks/`** — local DuckDB exploration (free, no Snowflake needed).
-- **`docs/`** — HTML decision write-ups (see Documentation conventions).
+- **`docs/`** — HTML reference write-ups (see Documentation conventions).
 
-## Engine split (don't conflate)
-- **DuckDB** = local/dev exploration in `notebooks/` only.
-- **Snowflake** = the production warehouse dbt builds.
-- Rationale: [`docs/why-duckdb.html`](docs/why-duckdb.html) (local) +
-  [`docs/productionizing.html`](docs/productionizing.html) (prod).
+## Engine: Snowflake only
+- The pipeline runs entirely on **Snowflake**. There is no DuckDB in the codebase.
+- `docs/why-duckdb.html` is a **reference explainer** on DuckDB (what it is, when
+  it fits) for context — not an engine used here.
+- Production rationale: [`docs/productionizing.html`](docs/productionizing.html).
 
 ## Conventions
 - **No hard-coded credentials.** Everything reads env vars (`.env` locally,

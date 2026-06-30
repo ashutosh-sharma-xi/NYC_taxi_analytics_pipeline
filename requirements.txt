@@ -1,6 +1,7 @@
 # --- Ingestion (batch loader into Snowflake RAW) ---
 snowflake-connector-python>=3.7.0
 python-dotenv>=1.0.0
+requests>=2.31.0
 
 # --- Transformation (dbt on Snowflake) ---
 dbt-core>=1.7.0
@@ -9,12 +10,6 @@ dbt-snowflake>=1.7.0
 # --- Orchestration (Airflow) ---
 # Heavy + Linux-oriented; on Windows run Airflow via WSL or Docker.
 apache-airflow>=2.8.0
-
-# --- Local analysis notebooks (DuckDB) ---
-duckdb>=1.1.0
-jupyter>=1.0.0
-pandas>=2.0.0
-matplotlib>=3.7.0
 
 # --- Bonus: Spark historical processing ---
 pyspark>=3.5.0

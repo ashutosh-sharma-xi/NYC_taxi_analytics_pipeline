@@ -21,14 +21,14 @@ CloudFront Parquet ──> ingestion/ ──> Snowflake RAW ──> dbt (staging
 - **`dbt/`** — all modeling + tests. Zone lookup is a **seed**. Sources have a
   **freshness** check on `_loaded_at`.
 - **`dags/`** — `nyc_taxi_daily_pipeline` Airflow DAG (daily 02:00 UTC).
-- **`queries/`** — ad-hoc analytical SQL against the marts.
+- **`analysis/`** — ad-hoc analytical SQL (Snowflake) against the marts / RAW.
+- **`queries/`** — assessment query set.
 - **`spark/`** — (bonus) PySpark historical processor.
-- **`notebooks/`** — local DuckDB exploration (free, no Snowflake needed).
-- **`docs/`** — engine rationale + productionizing notes (HTML).
+- **`docs/`** — reference write-ups (HTML): `productionizing.html`, plus
+  `why-duckdb.html` (a DuckDB explainer for context — not used here).
 
-> **Why Snowflake, not DuckDB, in production?** DuckDB powers the local
-> `notebooks/` for free exploration. Snowflake is the production warehouse. See
-> [`docs/`](docs/).
+> **Engine: Snowflake only.** The pipeline runs entirely on Snowflake. See
+> [`docs/productionizing.html`](docs/productionizing.html).
 
 ## dbt layers
 

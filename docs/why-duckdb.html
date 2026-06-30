@@ -59,51 +59,49 @@
 <body>
 <div class="wrap">
 
-  <span class="badge"><span class="dot"></span> NYC Taxi Analytics Pipeline · Engine Decision</span>
-  <h1><span class="y">DuckDB</span> for local analysis</h1>
-  <p class="lede">Two engines, two jobs. <b style="color:var(--ink)">DuckDB</b> powers fast, free local exploration in the notebooks; <b style="color:var(--ink)">Snowflake</b> is the production warehouse the dbt pipeline builds. This page explains the local choice — see <span class="pill">productionizing.html</span> for the prod side.</p>
+  <span class="badge"><span class="dot"></span> Reference · Understanding DuckDB</span>
+  <h1>Understanding <span class="y">DuckDB</span></h1>
+  <p class="lede">A primer: what DuckDB is, how it compares to Snowflake, and when each is the right tool. <b style="color:var(--ink)">This project runs on Snowflake</b> — DuckDB is documented here for context, since it's the tool you'd reach for to explore a Parquet file in seconds.</p>
 
   <div class="grid">
-    <div class="card"><div class="num">~3–4GB</div><div class="lbl">Full-year 2023 dataset</div></div>
-    <div class="card"><div class="num">0</div><div class="lbl">Accounts, trials, or expiry</div></div>
-    <div class="card"><div class="num">1</div><div class="lbl">Node — single-binary compute</div></div>
-    <div class="card"><div class="num">100%</div><div class="lbl">Reproducible by a reviewer</div></div>
+    <div class="card"><div class="num">in‑process</div><div class="lbl">Runs inside your app — no server</div></div>
+    <div class="card"><div class="num">columnar</div><div class="lbl">Vectorised, fast at aggregations</div></div>
+    <div class="card"><div class="num">Parquet</div><div class="lbl">Reads files in place, even over HTTP/S3</div></div>
+    <div class="card"><div class="num">pip</div><div class="lbl">Zero setup, free, single binary</div></div>
   </div>
 
-  <h2>Why DuckDB for the local layer</h2>
+  <h2>What is DuckDB?</h2>
   <div class="card" style="padding:8px 20px">
-    <div class="reason"><div class="ico">🦆</div><div><b>Right-sized compute</b><span>3–4 GB fits comfortably in single-node memory. A distributed warehouse solves a scale problem we don't have.</span></div></div>
-    <div class="reason"><div class="ico">📦</div><div><b>Reads Parquet in place</b><span>DuckDB queries remote/local Parquet directly — no load step, no staging, no copy.</span></div></div>
-    <div class="reason"><div class="ico">🔁</div><div><b>Reproducible deliverable</b><span>A reviewer runs the notebooks as-is. No account to provision, no trial clock, nothing to expire.</span></div></div>
-    <div class="reason"><div class="ico">🔌</div><div><b>Warehouse-portable SQL</b><span>The star-schema DDL and analytics SQL lift cleanly to Snowflake/BigQuery later.</span></div></div>
-    <div class="reason"><div class="ico">⚡</div><div><b>Zero-setup speed</b><span><code>pip install duckdb</code> and you're querying. Minutes, not onboarding.</span></div></div>
+    <div class="reason"><div class="ico">🦆</div><div><b>"SQLite for analytics"</b><span>An in-process analytical (OLAP) database. It runs inside your Python/CLI process — no account, no server, no cluster.</span></div></div>
+    <div class="reason"><div class="ico">📦</div><div><b>Reads files directly</b><span>Queries local or remote Parquet/CSV in place — no load step, no staging. Only the columns/rows a query needs are fetched.</span></div></div>
+    <div class="reason"><div class="ico">⚡</div><div><b>Genuinely fast on one machine</b><span>Columnar + vectorised execution makes it quick for GB-scale aggregations on a laptop.</span></div></div>
+    <div class="reason"><div class="ico">🔌</div><div><b>Portable SQL</b><span>ANSI-style SQL that lifts cleanly to Snowflake / BigQuery — prototype locally, promote to the warehouse.</span></div></div>
   </div>
 
-  <h2>Division of labour</h2>
+  <h2>DuckDB vs Snowflake</h2>
   <table>
-    <tr><th>Dimension</th><th>DuckDB · local</th><th>Snowflake · production</th></tr>
-    <tr><td>Role</td><td class="yes">Explore & prototype</td><td class="yes">Serve the pipeline</td></tr>
-    <tr><td>Lives in</td><td><span class="pill">notebooks/</span></td><td><span class="pill">dbt/</span> + <span class="pill">ingestion/</span></td></tr>
-    <tr><td>Setup cost</td><td class="yes">pip install</td><td>Account + warehouse</td></tr>
+    <tr><th>Dimension</th><th>DuckDB</th><th>Snowflake</th></tr>
+    <tr><td>Runs where</td><td>In your process, one machine</td><td class="yes">Cloud, distributed</td></tr>
+    <tr><td>Setup</td><td class="yes">pip install</td><td>Account + warehouse</td></tr>
     <tr><td>Reads Parquet directly</td><td class="yes">Native, in place</td><td>Loaded via stage</td></tr>
-    <tr><td>Reproducible offline</td><td class="yes">Fully, no creds</td><td>Needs account</td></tr>
-    <tr><td>SQL portability</td><td class="yes">ANSI-ish</td><td class="yes">ANSI-ish</td></tr>
-    <tr><td>Concurrent users / scale</td><td>Single-node</td><td class="yes">Elastic, multi-user</td></tr>
+    <tr><td>Scale ceiling</td><td>One node (GBs–low TBs)</td><td class="yes">Effectively unbounded</td></tr>
+    <tr><td>Concurrency</td><td>Single user/process</td><td class="yes">Many users, isolated compute</td></tr>
+    <tr><td>Persistence / sharing</td><td>A local file</td><td class="yes">Shared, governed, always-on</td></tr>
+    <tr><td>Cost</td><td class="yes">Free</td><td>Per compute-second + storage</td></tr>
   </table>
-  <p style="color:var(--muted);font-size:14px;margin-top:14px">Same SQL, two homes: prototype a query against DuckDB in a notebook, then promote the logic into a dbt model that runs on Snowflake. Portable SQL is what makes that handoff free.</p>
 
-  <h2>Why not just use one for both?</h2>
+  <h2>When to use which</h2>
   <div class="row">
-    <div class="card"><b style="color:var(--accent)">DuckDB everywhere?</b><p style="color:var(--muted);font-size:14px;margin-top:6px">Great for a laptop, but no shared warehouse, roles, scheduling, or concurrent BI — the things a production pipeline needs.</p></div>
-    <div class="card"><b style="color:var(--accent)">Snowflake everywhere?</b><p style="color:var(--muted);font-size:14px;margin-top:6px">Needs an account + warehouse spin-up just to poke at the data. Slower, costlier loop for quick exploration.</p></div>
+    <div class="card"><b style="color:var(--duck)">Reach for DuckDB when…</b><p style="color:var(--muted);font-size:14px;margin-top:6px">Exploring/prototyping a query, single-analyst work on data that fits one machine, embedding analytics in an app/CI/notebook, or transforming Parquet/CSV with no infra.</p></div>
+    <div class="card"><b style="color:var(--snow,#29b5e8)">Reach for Snowflake when…</b><p style="color:var(--muted);font-size:14px;margin-top:6px">Many concurrent users / BI dashboards, a shared governed always-on warehouse with roles, data beyond one machine, or a managed production pipeline (this project).</p></div>
   </div>
 
   <div class="verdict">
-    <h2>Verdict</h2>
-    <p>Use each engine where it's strongest: <b style="color:var(--duck)">DuckDB for the fast, free, offline exploration loop</b> in the notebooks, and <b style="color:var(--snow,#29b5e8)">Snowflake as the production warehouse</b> the dbt project builds and tests. Warehouse-portable SQL lets the same logic move from one to the other with no rewrite.</p>
+    <h2>The one-liner</h2>
+    <p><b style="color:var(--duck)">DuckDB is the fast, free exploration engine; Snowflake is the production warehouse.</b> They share portable SQL, so logic prototyped in DuckDB moves to Snowflake with no rewrite. For a managed, multi-user, always-on pipeline like this one, Snowflake is the right home.</p>
   </div>
 
-  <div class="foot">NYC Taxi Analytics Pipeline · Local engine rationale · DuckDB 🦆 explore → Snowflake ❄ produce</div>
+  <div class="foot">NYC Taxi Analytics Pipeline · Reference · DuckDB 🦆 explore · Snowflake ❄ produce</div>
 
 </div>
 </body>

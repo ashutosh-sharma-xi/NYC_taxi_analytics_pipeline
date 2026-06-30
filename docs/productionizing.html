@@ -59,13 +59,13 @@
   <h1>Production on <span class="s">Snowflake</span>, deployed by CI/CD</h1>
   <p class="lede">An exploratory project built at production level — the goal is learning the real warehouse + CI/CD workflow. Snowflake is the warehouse; GitHub Actions deploys the pipeline; everything is parameterized so it ports to <i>any</i> Snowflake account by swapping secrets.</p>
 
-  <div class="note">DuckDB still powers the local <span class="pill">notebooks/</span> for fast, free exploration. Production runs on <b>Snowflake</b> — the SQL written in the notebooks is warehouse-portable, so it lifts over unchanged.</div>
+  <div class="note">The pipeline runs entirely on <b>Snowflake</b>: <span class="pill">ingestion/</span> lands raw data and <span class="pill">dbt/</span> builds the modeled layers. Ad-hoc analysis lives in <span class="pill">analysis/</span> as Snowflake SQL.</div>
 
   <h2>Why Snowflake here</h2>
   <div class="row">
     <div class="card">
       <h3 style="margin:0 0 6px;font-size:19px;color:var(--snow)">Learning the real stack</h3>
-      <p style="color:var(--muted);font-size:14px">External tables, virtual warehouses, roles, and CI-driven DDL — the actual patterns you'd run in industry, on real cloud compute + storage.</p>
+      <p style="color:var(--muted);font-size:14px">Stages + COPY, virtual warehouses, roles, and CI-driven dbt — the actual patterns you'd run in industry, on real cloud compute + storage.</p>
     </div>
     <div class="card">
       <h3 style="margin:0 0 6px;font-size:19px;color:var(--snow)">Free to start, portable later</h3>
@@ -77,17 +77,17 @@
   <h2>Architecture — CI/CD-driven warehouse build</h2>
   <div class="card">
     <div class="flow">
-      <div class="node"><b>Git push</b><span>SQL / DDL change</span></div>
+      <div class="node"><b>Git push</b><span>model change</span></div>
       <span class="arrow">→</span>
       <div class="node"><b>GitHub Actions</b><span>CI/CD</span></div>
       <span class="arrow">→</span>
-      <div class="node snow"><b>Snowflake</b><span>external table</span></div>
+      <div class="node snow"><b>Snowflake RAW</b><span>ingestion COPY</span></div>
       <span class="arrow">→</span>
-      <div class="node snow"><b>Star schema</b><span>fact + dims</span></div>
+      <div class="node snow"><b>dbt marts</b><span>staging→int→marts</span></div>
       <span class="arrow">→</span>
       <div class="node"><b>Analytics</b><span>BI / queries</span></div>
     </div>
-    <p style="color:var(--muted);font-size:13px;margin-top:12px">The public TLC Parquet is read by a Snowflake <b>external table</b> — no ingestion copy needed. CI applies the DDL idempotently; a monthly schedule refreshes for new data.</p>
+    <p style="color:var(--muted);font-size:13px;margin-top:12px">Ingestion downloads the public TLC Parquet and <code>COPY</code>s it into RAW; dbt builds the modeled layers idempotently. A monthly schedule (Airflow / GH Actions) refreshes for new data.</p>
   </div>
 
   <h2>Connection is parameterized — the key to portability</h2>
@@ -104,7 +104,7 @@ SNOWFLAKE_SCHEMA</pre>
   <h2>The CI/CD workflow</h2>
   <pre><span class="c"># .github/workflows/deploy.yml</span>
 <span class="k">on</span>:
-  <span class="k">push</span>: { branches: [main], paths: [<span class="s">'sql/**'</span>] }   <span class="c"># deploy on SQL change</span>
+  <span class="k">push</span>: { branches: [main], paths: [<span class="s">'dbt/**'</span>] }   <span class="c"># deploy on model change</span>
   <span class="k">schedule</span>: [{ cron: <span class="s">"0 6 5 * *"</span> }]            <span class="c"># monthly refresh after TLC publishes</span>
   <span class="k">workflow_dispatch</span>:                            <span class="c"># manual / backfill</span>
 <span class="k">jobs</span>:
@@ -116,64 +116,49 @@ SNOWFLAKE_SCHEMA</pre>
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
       SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
       SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
     <span class="k">steps</span>:
       - <span class="k">uses</span>: actions/checkout@v4
-      - <span class="k">run</span>: pip install snowflake-connector-python
-      - <span class="k">run</span>: python deploy/run_sql.py sql/    <span class="c"># executes versioned .sql files in order</span></pre>
-  <div class="note">A new Snowflake account? Update the six secrets, re-run the workflow. The <span class="pill">sql/</span> files never change — that's what "portable" means in practice.</div>
+      - <span class="k">run</span>: pip install -r requirements.txt
+      - <span class="k">run</span>: python ingestion/load.py          <span class="c"># land RAW</span>
+      - <span class="k">run</span>: cd dbt &amp;&amp; dbt seed &amp;&amp; dbt run &amp;&amp; dbt test   <span class="c"># model + test</span></pre>
+  <div class="note">A new Snowflake account? Update the secrets, re-run the workflow. The <span class="pill">ingestion/</span> + <span class="pill">dbt/</span> code never changes — that's what "portable" means in practice.</div>
 
-  <h2>The warehouse DDL — same model as the notebooks</h2>
-  <p style="color:var(--muted);font-size:14px;margin-bottom:12px">External table over the public Parquet, then the same DQ filters + star schema proven in notebook <code>03</code>.</p>
-  <pre><span class="c">-- sql/01_external_table.sql</span>
-<span class="k">CREATE STAGE IF NOT EXISTS</span> tlc_stage
-  <span class="k">URL</span>=<span class="s">'s3://nyc-tlc/trip data/'</span>
-  <span class="k">FILE_FORMAT</span>=(<span class="k">TYPE</span>=parquet);
+  <h2>Ingest → model: how data actually lands</h2>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:12px">The public <code>s3://nyc-tlc</code> bucket denies anonymous access, so ingestion pulls Parquet from the CloudFront mirror and <code>COPY</code>s it into a RAW table. dbt then builds the modeled layers.</p>
+  <pre><span class="c">-- ingestion/sql — land RAW (PUT from CloudFront download, then COPY)</span>
+<span class="k">CREATE TABLE IF NOT EXISTS</span> raw_yellow_tripdata (
+  tpep_pickup_datetime  <span class="f">TIMESTAMP_NTZ</span>, tpep_dropoff_datetime <span class="f">TIMESTAMP_NTZ</span>,
+  passenger_count <span class="f">NUMBER</span>, trip_distance <span class="f">FLOAT</span>,
+  PULocationID <span class="f">NUMBER</span>, DOLocationID <span class="f">NUMBER</span>, payment_type <span class="f">NUMBER</span>,
+  fare_amount <span class="f">FLOAT</span>, tip_amount <span class="f">FLOAT</span>, total_amount <span class="f">FLOAT</span>,
+  _loaded_at <span class="f">TIMESTAMP_NTZ</span> <span class="k">DEFAULT</span> CURRENT_TIMESTAMP()   <span class="c">-- drives source freshness</span>
+);
 
-<span class="k">CREATE EXTERNAL TABLE IF NOT EXISTS</span> ext_yellow_2023 (
-  tpep_pickup_datetime  <span class="f">TIMESTAMP</span> <span class="k">AS</span> (value:tpep_pickup_datetime::timestamp),
-  tpep_dropoff_datetime <span class="f">TIMESTAMP</span> <span class="k">AS</span> (value:tpep_dropoff_datetime::timestamp),
-  passenger_count       <span class="f">INT</span>       <span class="k">AS</span> (value:passenger_count::int),
-  trip_distance         <span class="f">FLOAT</span>     <span class="k">AS</span> (value:trip_distance::float),
-  PULocationID          <span class="f">INT</span>       <span class="k">AS</span> (value:PULocationID::int),
-  DOLocationID          <span class="f">INT</span>       <span class="k">AS</span> (value:DOLocationID::int),
-  fare_amount           <span class="f">FLOAT</span>     <span class="k">AS</span> (value:fare_amount::float),
-  tip_amount            <span class="f">FLOAT</span>     <span class="k">AS</span> (value:tip_amount::float),
-  total_amount          <span class="f">FLOAT</span>     <span class="k">AS</span> (value:total_amount::float),
-  payment_type          <span class="f">INT</span>       <span class="k">AS</span> (value:payment_type::int)
-)
-  <span class="k">LOCATION</span>=@tlc_stage
-  <span class="k">PATTERN</span>=<span class="s">'.*yellow_tripdata_2023-.*[.]parquet'</span>
-  <span class="k">FILE_FORMAT</span>=(<span class="k">TYPE</span>=parquet);</pre>
-  <pre><span class="c">-- sql/02_fact_trips.sql  — same DQ filters as notebook 02</span>
-<span class="k">CREATE OR REPLACE TABLE</span> fact_trips <span class="k">AS</span>
-<span class="k">SELECT</span>
-  tpep_pickup_datetime::date          <span class="k">AS</span> date_key,
-  PULocationID                        <span class="k">AS</span> pu_location_id,
-  DOLocationID                        <span class="k">AS</span> do_location_id,
-  payment_type, trip_distance,
-  fare_amount, tip_amount, total_amount
-<span class="k">FROM</span> ext_yellow_2023
-<span class="k">WHERE</span> fare_amount &gt; 0 <span class="k">AND</span> trip_distance &gt; 0
-  <span class="k">AND</span> tpep_dropoff_datetime &gt; tpep_pickup_datetime
-  <span class="k">AND</span> passenger_count <span class="k">BETWEEN</span> 1 <span class="k">AND</span> 6
-  <span class="k">AND</span> <span class="k">EXTRACT</span>(<span class="k">YEAR</span> <span class="k">FROM</span> tpep_pickup_datetime) = 2023;</pre>
+<span class="k">COPY INTO</span> raw_yellow_tripdata <span class="k">FROM</span> @raw_stage
+  FILE_FORMAT=(TYPE=parquet)
+  MATCH_BY_COLUMN_NAME=CASE_INSENSITIVE;   <span class="c">-- skips already-loaded files</span></pre>
+  <pre><span class="c">-- dbt/models/marts/fct_trips.sql — incremental, DQ filters in the intermediate layer</span>
+{{ config(materialized=<span class="s">'incremental'</span>, unique_key=<span class="s">'trip_id'</span>) }}
+<span class="k">SELECT</span> * <span class="k">FROM</span> {{ ref(<span class="s">'int_trips_enriched'</span>) }}
+{% <span class="k">if</span> is_incremental() %}
+  <span class="k">WHERE</span> pickup_datetime &gt; (<span class="k">SELECT MAX</span>(pickup_datetime) <span class="k">FROM</span> {{ this }})
+{% endif %}</pre>
 
   <h2>Where it runs — cost shape</h2>
   <table>
     <tr><th>Layer</th><th>Choice</th><th>Cost</th></tr>
     <tr><td>Warehouse</td><td>Snowflake (trial → paid/other account)</td><td class="yes">Free 30 days, then per-credit</td></tr>
     <tr><td>CI/CD</td><td class="yes">GitHub Actions</td><td>2,000 min/mo free</td></tr>
-    <tr><td>Ingestion</td><td>External table on public S3</td><td class="yes">No copy, no egress</td></tr>
-    <tr><td>Local dev</td><td class="yes">DuckDB notebooks</td><td>$0, no expiry</td></tr>
+    <tr><td>Ingestion</td><td>CloudFront download → PUT/COPY into RAW</td><td class="yes">Public source, no creds</td></tr>
+    <tr><td>Ad-hoc analysis</td><td class="yes">analysis/ SQL in Snowsight</td><td>$0</td></tr>
   </table>
 
   <h2>Production hardening checklist</h2>
   <div class="card">
     <div class="chk">Connection fully parameterized via secrets — portable to any account</div>
-    <div class="chk">SQL versioned in <code>sql/</code>, applied in order, idempotent (<code>CREATE OR REPLACE</code>)</div>
-    <div class="chk">DQ filters identical to notebook 02 — single source of truth for cleaning</div>
-    <div class="chk">Deploy on push to <code>sql/**</code> + scheduled monthly refresh + manual dispatch</div>
+    <div class="chk">Models versioned in <code>dbt/</code>; idempotent rebuilds + incremental fct_trips</div>
+    <div class="chk">DQ filters live once in the dbt intermediate layer — single source of truth</div>
+    <div class="chk">Deploy on push to <code>dbt/**</code> + scheduled refresh (Airflow DAG) + manual dispatch</div>
     <div class="chk">Key-pair / OAuth auth for prod (password only for trial exploration)</div>
     <div class="chk">Least-privilege role; warehouse auto-suspend to cap credit burn</div>
   </div>
