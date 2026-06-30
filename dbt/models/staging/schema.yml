@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg_yellow_trips
+    description: "Cleaned/cast Yellow Taxi trips, 1:1 with the raw source, with a surrogate trip_id and trip_duration_minutes."
+    columns:
+      - name: trip_id
+        description: "Surrogate key (md5 of natural columns). May repeat for genuine duplicate trips; deduped in fct_trips."
+        tests:
+          - not_null
+      - name: pickup_datetime
+        tests:
+          - not_null
+      - name: passenger_count
+        description: "Number of passengers; unfiltered at staging."
+
+  - name: stg_taxi_zones
+    description: "Taxi zone dimension from the seed: location_id -> borough / zone / service_zone."
+    columns:
+      - name: location_id
+        tests:
+          - not_null
+          - unique
+      - name: borough
+        tests:
+          - not_null

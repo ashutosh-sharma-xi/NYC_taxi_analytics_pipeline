@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why DuckDB · NYC Taxi Analytics Pipeline</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330;
+    --ink:#e6edf3; --muted:#8b949e; --line:#30363d;
+    --duck:#fff200; --duck2:#ffd21e; --accent:#58a6ff;
+    --good:#3fb950; --warn:#f85149;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%,#1a2233,transparent),var(--bg);
+    color:var(--ink); line-height:1.55; padding:48px 20px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px;margin:0 auto}
+  .badge{display:inline-flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:13px;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--duck);box-shadow:0 0 12px var(--duck)}
+  h1{font-size:42px;line-height:1.1;margin:22px 0 10px;letter-spacing:-1px}
+  h1 .y{color:var(--duck)}
+  .lede{color:var(--muted);font-size:18px;max-width:640px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:34px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;
+    transition:transform .15s ease,border-color .15s ease}
+  .card:hover{transform:translateY(-3px);border-color:var(--duck2)}
+  .card .num{font-size:30px;font-weight:700;color:var(--duck)}
+  .card .lbl{font-size:13px;color:var(--muted);margin-top:4px}
+  h2{font-size:24px;margin:40px 0 16px;display:flex;align-items:center;gap:10px}
+  h2::before{content:"";width:4px;height:22px;background:var(--duck);border-radius:2px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.row{grid-template-columns:1fr}}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;overflow:hidden;font-size:14px}
+  th,td{text-align:left;padding:12px 16px;border-bottom:1px solid var(--line)}
+  th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  tr:last-child td{border-bottom:none}
+  .yes{color:var(--good);font-weight:600}
+  .no{color:var(--warn);font-weight:600}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);
+    border-radius:6px;padding:2px 8px;font-size:12px;color:var(--muted);font-family:ui-monospace,monospace}
+  .verdict{background:linear-gradient(135deg,#1c2330,#161b22);border:1px solid var(--duck2);
+    border-radius:16px;padding:26px;margin-top:40px}
+  .verdict h2{margin-top:0}
+  .verdict p{color:var(--ink)}
+  code{background:var(--panel2);padding:2px 6px;border-radius:5px;font-family:ui-monospace,monospace;font-size:13px;color:var(--duck2)}
+  .foot{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  .reason{display:flex;gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .reason:last-child{border:none}
+  .reason .ico{font-size:24px;flex-shrink:0}
+  .reason b{display:block;margin-bottom:2px}
+  .reason span{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="badge"><span class="dot"></span> NYC Taxi Analytics Pipeline · Engine Decision</span>
+  <h1><span class="y">DuckDB</span> for local analysis</h1>
+  <p class="lede">Two engines, two jobs. <b style="color:var(--ink)">DuckDB</b> powers fast, free local exploration in the notebooks; <b style="color:var(--ink)">Snowflake</b> is the production warehouse the dbt pipeline builds. This page explains the local choice — see <span class="pill">productionizing.html</span> for the prod side.</p>
+
+  <div class="grid">
+    <div class="card"><div class="num">~3–4GB</div><div class="lbl">Full-year 2023 dataset</div></div>
+    <div class="card"><div class="num">0</div><div class="lbl">Accounts, trials, or expiry</div></div>
+    <div class="card"><div class="num">1</div><div class="lbl">Node — single-binary compute</div></div>
+    <div class="card"><div class="num">100%</div><div class="lbl">Reproducible by a reviewer</div></div>
+  </div>
+
+  <h2>Why DuckDB for the local layer</h2>
+  <div class="card" style="padding:8px 20px">
+    <div class="reason"><div class="ico">🦆</div><div><b>Right-sized compute</b><span>3–4 GB fits comfortably in single-node memory. A distributed warehouse solves a scale problem we don't have.</span></div></div>
+    <div class="reason"><div class="ico">📦</div><div><b>Reads Parquet in place</b><span>DuckDB queries remote/local Parquet directly — no load step, no staging, no copy.</span></div></div>
+    <div class="reason"><div class="ico">🔁</div><div><b>Reproducible deliverable</b><span>A reviewer runs the notebooks as-is. No account to provision, no trial clock, nothing to expire.</span></div></div>
+    <div class="reason"><div class="ico">🔌</div><div><b>Warehouse-portable SQL</b><span>The star-schema DDL and analytics SQL lift cleanly to Snowflake/BigQuery later.</span></div></div>
+    <div class="reason"><div class="ico">⚡</div><div><b>Zero-setup speed</b><span><code>pip install duckdb</code> and you're querying. Minutes, not onboarding.</span></div></div>
+  </div>
+
+  <h2>Division of labour</h2>
+  <table>
+    <tr><th>Dimension</th><th>DuckDB · local</th><th>Snowflake · production</th></tr>
+    <tr><td>Role</td><td class="yes">Explore & prototype</td><td class="yes">Serve the pipeline</td></tr>
+    <tr><td>Lives in</td><td><span class="pill">notebooks/</span></td><td><span class="pill">dbt/</span> + <span class="pill">ingestion/</span></td></tr>
+    <tr><td>Setup cost</td><td class="yes">pip install</td><td>Account + warehouse</td></tr>
+    <tr><td>Reads Parquet directly</td><td class="yes">Native, in place</td><td>Loaded via stage</td></tr>
+    <tr><td>Reproducible offline</td><td class="yes">Fully, no creds</td><td>Needs account</td></tr>
+    <tr><td>SQL portability</td><td class="yes">ANSI-ish</td><td class="yes">ANSI-ish</td></tr>
+    <tr><td>Concurrent users / scale</td><td>Single-node</td><td class="yes">Elastic, multi-user</td></tr>
+  </table>
+  <p style="color:var(--muted);font-size:14px;margin-top:14px">Same SQL, two homes: prototype a query against DuckDB in a notebook, then promote the logic into a dbt model that runs on Snowflake. Portable SQL is what makes that handoff free.</p>
+
+  <h2>Why not just use one for both?</h2>
+  <div class="row">
+    <div class="card"><b style="color:var(--accent)">DuckDB everywhere?</b><p style="color:var(--muted);font-size:14px;margin-top:6px">Great for a laptop, but no shared warehouse, roles, scheduling, or concurrent BI — the things a production pipeline needs.</p></div>
+    <div class="card"><b style="color:var(--accent)">Snowflake everywhere?</b><p style="color:var(--muted);font-size:14px;margin-top:6px">Needs an account + warehouse spin-up just to poke at the data. Slower, costlier loop for quick exploration.</p></div>
+  </div>
+
+  <div class="verdict">
+    <h2>Verdict</h2>
+    <p>Use each engine where it's strongest: <b style="color:var(--duck)">DuckDB for the fast, free, offline exploration loop</b> in the notebooks, and <b style="color:var(--snow,#29b5e8)">Snowflake as the production warehouse</b> the dbt project builds and tests. Warehouse-portable SQL lets the same logic move from one to the other with no rewrite.</p>
+  </div>
+
+  <div class="foot">NYC Taxi Analytics Pipeline · Local engine rationale · DuckDB 🦆 explore → Snowflake ❄ produce</div>
+
+</div>
+</body>
+</html>

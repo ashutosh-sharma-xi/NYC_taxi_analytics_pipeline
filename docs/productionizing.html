@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Productionizing · NYC Taxi Analytics Pipeline</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330;
+    --ink:#e6edf3; --muted:#8b949e; --line:#30363d;
+    --snow:#29b5e8; --snow2:#7fd4f1; --duck:#fff200; --accent:#58a6ff;
+    --good:#3fb950; --warn:#f85149;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%,#10283a,transparent),var(--bg);
+    color:var(--ink); line-height:1.55; padding:48px 20px; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px;margin:0 auto}
+  .badge{display:inline-flex;align-items:center;gap:8px;background:var(--panel);
+    border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:13px;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--snow);box-shadow:0 0 12px var(--snow)}
+  h1{font-size:40px;line-height:1.1;margin:22px 0 10px;letter-spacing:-1px}
+  h1 .s{color:var(--snow)}
+  .lede{color:var(--muted);font-size:18px;max-width:680px}
+  h2{font-size:24px;margin:42px 0 16px;display:flex;align-items:center;gap:10px}
+  h2::before{content:"";width:4px;height:22px;background:var(--snow);border-radius:2px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.row{grid-template-columns:1fr}}
+  code{background:var(--panel2);padding:2px 6px;border-radius:5px;font-family:ui-monospace,monospace;font-size:13px;color:var(--snow2)}
+  pre{background:#0a0e14;border:1px solid var(--line);border-radius:12px;padding:18px;overflow-x:auto;
+    font-family:ui-monospace,SFMono-Regular,monospace;font-size:13px;line-height:1.5;color:#c9d1d9}
+  pre .k{color:#ff7b72} pre .s{color:#a5d6ff} pre .c{color:#8b949e;font-style:italic} pre .f{color:#d2a8ff} pre .v{color:#ffa657}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;overflow:hidden;font-size:14px}
+  th,td{text-align:left;padding:11px 15px;border-bottom:1px solid var(--line)}
+  th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  tr:last-child td{border-bottom:none}
+  .yes{color:var(--good);font-weight:600} .no{color:var(--warn);font-weight:600}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0 4px}
+  .node{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:13px;min-width:118px;text-align:center}
+  .node b{display:block;color:var(--ink);font-size:14px} .node span{color:var(--muted);font-size:12px}
+  .node.snow{border-color:var(--snow)}
+  .arrow{color:var(--snow);font-size:20px;font-weight:700}
+  .note{border-left:3px solid var(--snow);padding:10px 16px;background:var(--panel);border-radius:0 10px 10px 0;color:var(--muted);font-size:14px;margin:14px 0}
+  .note.warn{border-left-color:var(--warn)}
+  .foot{margin-top:46px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+  .chk{font-size:14px;color:var(--muted);margin:6px 0;padding-left:24px;position:relative}
+  .chk::before{content:"✓";position:absolute;left:0;color:var(--good);font-weight:700}
+  .pill{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--snow2);font-family:ui-monospace,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="badge"><span class="dot"></span> NYC Taxi Analytics Pipeline · Productionizing</span>
+  <h1>Production on <span class="s">Snowflake</span>, deployed by CI/CD</h1>
+  <p class="lede">An exploratory project built at production level — the goal is learning the real warehouse + CI/CD workflow. Snowflake is the warehouse; GitHub Actions deploys the pipeline; everything is parameterized so it ports to <i>any</i> Snowflake account by swapping secrets.</p>
+
+  <div class="note">DuckDB still powers the local <span class="pill">notebooks/</span> for fast, free exploration. Production runs on <b>Snowflake</b> — the SQL written in the notebooks is warehouse-portable, so it lifts over unchanged.</div>
+
+  <h2>Why Snowflake here</h2>
+  <div class="row">
+    <div class="card">
+      <h3 style="margin:0 0 6px;font-size:19px;color:var(--snow)">Learning the real stack</h3>
+      <p style="color:var(--muted);font-size:14px">External tables, virtual warehouses, roles, and CI-driven DDL — the actual patterns you'd run in industry, on real cloud compute + storage.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 6px;font-size:19px;color:var(--snow)">Free to start, portable later</h3>
+      <p style="color:var(--muted);font-size:14px">Begin on a 30-day trial ($400 credits — ample for 4&nbsp;GB). Because the pipeline is account-agnostic, moving to a paid or different account is a <b>secrets swap</b>, not a rewrite.</p>
+    </div>
+  </div>
+  <div class="note warn">Caveat to plan around: the free trial expires at 30 days / $400. The CI/CD design below makes re-pointing to a new Snowflake account trivial — so trial expiry never means a rebuild.</div>
+
+  <h2>Architecture — CI/CD-driven warehouse build</h2>
+  <div class="card">
+    <div class="flow">
+      <div class="node"><b>Git push</b><span>SQL / DDL change</span></div>
+      <span class="arrow">→</span>
+      <div class="node"><b>GitHub Actions</b><span>CI/CD</span></div>
+      <span class="arrow">→</span>
+      <div class="node snow"><b>Snowflake</b><span>external table</span></div>
+      <span class="arrow">→</span>
+      <div class="node snow"><b>Star schema</b><span>fact + dims</span></div>
+      <span class="arrow">→</span>
+      <div class="node"><b>Analytics</b><span>BI / queries</span></div>
+    </div>
+    <p style="color:var(--muted);font-size:13px;margin-top:12px">The public TLC Parquet is read by a Snowflake <b>external table</b> — no ingestion copy needed. CI applies the DDL idempotently; a monthly schedule refreshes for new data.</p>
+  </div>
+
+  <h2>Connection is parameterized — the key to portability</h2>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:12px">No account identifier, user, or warehouse name is ever hard-coded. They live in <b>GitHub Actions secrets</b>. Point the whole pipeline at a different Snowflake account by editing secrets in the repo settings — zero code change.</p>
+  <pre><span class="c"># GitHub repo → Settings → Secrets and variables → Actions</span>
+SNOWFLAKE_ACCOUNT     <span class="c"># e.g. ab12345.eu-west-1</span>
+SNOWFLAKE_USER
+SNOWFLAKE_PASSWORD    <span class="c"># or key-pair / OAuth for prod</span>
+SNOWFLAKE_ROLE        <span class="c"># e.g. SYSADMIN</span>
+SNOWFLAKE_WAREHOUSE   <span class="c"># e.g. COMPUTE_WH</span>
+SNOWFLAKE_DATABASE
+SNOWFLAKE_SCHEMA</pre>
+
+  <h2>The CI/CD workflow</h2>
+  <pre><span class="c"># .github/workflows/deploy.yml</span>
+<span class="k">on</span>:
+  <span class="k">push</span>: { branches: [main], paths: [<span class="s">'sql/**'</span>] }   <span class="c"># deploy on SQL change</span>
+  <span class="k">schedule</span>: [{ cron: <span class="s">"0 6 5 * *"</span> }]            <span class="c"># monthly refresh after TLC publishes</span>
+  <span class="k">workflow_dispatch</span>:                            <span class="c"># manual / backfill</span>
+<span class="k">jobs</span>:
+  <span class="k">deploy</span>:
+    <span class="k">runs-on</span>: ubuntu-latest
+    <span class="k">env</span>:                                          <span class="c"># secrets → env, account-agnostic</span>
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+    <span class="k">steps</span>:
+      - <span class="k">uses</span>: actions/checkout@v4
+      - <span class="k">run</span>: pip install snowflake-connector-python
+      - <span class="k">run</span>: python deploy/run_sql.py sql/    <span class="c"># executes versioned .sql files in order</span></pre>
+  <div class="note">A new Snowflake account? Update the six secrets, re-run the workflow. The <span class="pill">sql/</span> files never change — that's what "portable" means in practice.</div>
+
+  <h2>The warehouse DDL — same model as the notebooks</h2>
+  <p style="color:var(--muted);font-size:14px;margin-bottom:12px">External table over the public Parquet, then the same DQ filters + star schema proven in notebook <code>03</code>.</p>
+  <pre><span class="c">-- sql/01_external_table.sql</span>
+<span class="k">CREATE STAGE IF NOT EXISTS</span> tlc_stage
+  <span class="k">URL</span>=<span class="s">'s3://nyc-tlc/trip data/'</span>
+  <span class="k">FILE_FORMAT</span>=(<span class="k">TYPE</span>=parquet);
+
+<span class="k">CREATE EXTERNAL TABLE IF NOT EXISTS</span> ext_yellow_2023 (
+  tpep_pickup_datetime  <span class="f">TIMESTAMP</span> <span class="k">AS</span> (value:tpep_pickup_datetime::timestamp),
+  tpep_dropoff_datetime <span class="f">TIMESTAMP</span> <span class="k">AS</span> (value:tpep_dropoff_datetime::timestamp),
+  passenger_count       <span class="f">INT</span>       <span class="k">AS</span> (value:passenger_count::int),
+  trip_distance         <span class="f">FLOAT</span>     <span class="k">AS</span> (value:trip_distance::float),
+  PULocationID          <span class="f">INT</span>       <span class="k">AS</span> (value:PULocationID::int),
+  DOLocationID          <span class="f">INT</span>       <span class="k">AS</span> (value:DOLocationID::int),
+  fare_amount           <span class="f">FLOAT</span>     <span class="k">AS</span> (value:fare_amount::float),
+  tip_amount            <span class="f">FLOAT</span>     <span class="k">AS</span> (value:tip_amount::float),
+  total_amount          <span class="f">FLOAT</span>     <span class="k">AS</span> (value:total_amount::float),
+  payment_type          <span class="f">INT</span>       <span class="k">AS</span> (value:payment_type::int)
+)
+  <span class="k">LOCATION</span>=@tlc_stage
+  <span class="k">PATTERN</span>=<span class="s">'.*yellow_tripdata_2023-.*[.]parquet'</span>
+  <span class="k">FILE_FORMAT</span>=(<span class="k">TYPE</span>=parquet);</pre>
+  <pre><span class="c">-- sql/02_fact_trips.sql  — same DQ filters as notebook 02</span>
+<span class="k">CREATE OR REPLACE TABLE</span> fact_trips <span class="k">AS</span>
+<span class="k">SELECT</span>
+  tpep_pickup_datetime::date          <span class="k">AS</span> date_key,
+  PULocationID                        <span class="k">AS</span> pu_location_id,
+  DOLocationID                        <span class="k">AS</span> do_location_id,
+  payment_type, trip_distance,
+  fare_amount, tip_amount, total_amount
+<span class="k">FROM</span> ext_yellow_2023
+<span class="k">WHERE</span> fare_amount &gt; 0 <span class="k">AND</span> trip_distance &gt; 0
+  <span class="k">AND</span> tpep_dropoff_datetime &gt; tpep_pickup_datetime
+  <span class="k">AND</span> passenger_count <span class="k">BETWEEN</span> 1 <span class="k">AND</span> 6
+  <span class="k">AND</span> <span class="k">EXTRACT</span>(<span class="k">YEAR</span> <span class="k">FROM</span> tpep_pickup_datetime) = 2023;</pre>
+
+  <h2>Where it runs — cost shape</h2>
+  <table>
+    <tr><th>Layer</th><th>Choice</th><th>Cost</th></tr>
+    <tr><td>Warehouse</td><td>Snowflake (trial → paid/other account)</td><td class="yes">Free 30 days, then per-credit</td></tr>
+    <tr><td>CI/CD</td><td class="yes">GitHub Actions</td><td>2,000 min/mo free</td></tr>
+    <tr><td>Ingestion</td><td>External table on public S3</td><td class="yes">No copy, no egress</td></tr>
+    <tr><td>Local dev</td><td class="yes">DuckDB notebooks</td><td>$0, no expiry</td></tr>
+  </table>
+
+  <h2>Production hardening checklist</h2>
+  <div class="card">
+    <div class="chk">Connection fully parameterized via secrets — portable to any account</div>
+    <div class="chk">SQL versioned in <code>sql/</code>, applied in order, idempotent (<code>CREATE OR REPLACE</code>)</div>
+    <div class="chk">DQ filters identical to notebook 02 — single source of truth for cleaning</div>
+    <div class="chk">Deploy on push to <code>sql/**</code> + scheduled monthly refresh + manual dispatch</div>
+    <div class="chk">Key-pair / OAuth auth for prod (password only for trial exploration)</div>
+    <div class="chk">Least-privilege role; warehouse auto-suspend to cap credit burn</div>
+  </div>
+
+  <div class="foot">NYC Taxi Analytics Pipeline · Productionizing · Snowflake ❄ warehouse · GitHub Actions CI/CD · portable by secrets</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: raw_taxi
+    description: "Raw Yellow Taxi data landed by the ingestion layer (ingestion/load.py)."
+    database: "{{ env_var('SNOWFLAKE_DATABASE', 'NYC_TAXI') }}"
+    schema: "{{ env_var('RAW_SCHEMA', 'RAW') }}"
+
+    # Freshness is measured against _loaded_at (when the pipeline last loaded data),
+    # not the trip dates. Tuned for a daily-cadence orchestration: warn if no load
+    # in 36h, error after 72h. For a monthly schedule, widen these (e.g. 35d/70d).
+    loaded_at_field: _loaded_at
+    freshness:
+      warn_after: { count: 36, period: hour }
+      error_after: { count: 72, period: hour }
+
+    tables:
+      - name: yellow_tripdata
+        identifier: raw_yellow_tripdata
+        description: "One row per raw taxi trip as loaded from the monthly Parquet files."

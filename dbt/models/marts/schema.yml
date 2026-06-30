@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: fct_trips
+    description: "Fact table of all valid, enriched taxi trips. Grain = one trip. Incremental on pickup_datetime."
+    columns:
+      - name: trip_id
+        description: "Surrogate primary key, deduped in this model."
+        tests:
+          - not_null
+          - unique
+      - name: pickup_location_id
+        description: "FK to dim_zones.location_id."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_zones')
+              field: location_id
+      - name: trip_duration_minutes
+        description: "Trip length in minutes; must sit within the configured bounds."
+        tests:
+          - value_within_range:
+              min_value: "{{ var('min_trip_duration_minutes') }}"
+              max_value: "{{ var('max_trip_duration_minutes') }}"
+      - name: fare_amount
+        tests:
+          - not_null
+
+  - name: dim_zones
+    description: "Taxi zone dimension. One row per zone."
+    columns:
+      - name: location_id
+        tests:
+          - not_null
+          - unique
+
+  - name: agg_daily_revenue
+    description: "Daily revenue aggregation."
+    columns:
+      - name: revenue_date
+        tests:
+          - not_null
+          - unique
+
+  - name: agg_zone_performance
+    description: "Per pickup-zone performance with revenue rank and high-volume flag."
+    columns:
+      - name: pickup_location_id
+        tests:
+          - not_null
+          - unique

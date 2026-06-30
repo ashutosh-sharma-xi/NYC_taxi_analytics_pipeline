@@ -1,3 +1,16 @@
+# Project: downloaded data & local DuckDB warehouse
+data/
+*.duckdb
+
+# dbt artifacts
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+profiles.yml
+
+# Spark output
+spark_output/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -1,0 +1,19 @@
+# Copy to ~/.dbt/profiles.yml (or set DBT_PROFILES_DIR to this folder).
+# All values come from environment variables — the same .env the ingestion layer
+# uses. This is what makes the project portable to any Snowflake account: change
+# the env, not the code.
+
+nyc_taxi:
+  target: dev
+  outputs:
+    dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', 'ACCOUNTADMIN') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'NYC_TAXI') }}"
+      schema: "{{ env_var('DBT_SCHEMA', 'ANALYTICS') }}"   # staging/intermediate/marts suffix off this
+      threads: 4
+      client_session_keep_alive: false
