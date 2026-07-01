@@ -73,18 +73,37 @@ def load_month(cur, month, keep_local):
     log.info("[%s] PUT to stage complete", month)
 
     # COPY only THIS file (FILES=...). Snowflake's load history skips it on re-run.
+    # We use a transform SELECT (not MATCH_BY_COLUMN_NAME) so we can also capture
+    # METADATA$FILENAME as provenance and derive file_month from the file name.
+    # Parquet fields are read from the $1 VARIANT; keys are quoted to keep their case.
     cur.execute(f"""
-        COPY INTO raw_yellow_tripdata FROM @raw_stage
+        COPY INTO raw_yellow_tripdata
+          (tpep_pickup_datetime, tpep_dropoff_datetime, passenger_count, trip_distance,
+           PULocationID, DOLocationID, payment_type, fare_amount, tip_amount, total_amount,
+           source_file, file_month)
+        FROM (
+          SELECT
+            $1:"tpep_pickup_datetime"::timestamp_ntz,
+            $1:"tpep_dropoff_datetime"::timestamp_ntz,
+            $1:"passenger_count"::number,
+            $1:"trip_distance"::float,
+            $1:"PULocationID"::number,
+            $1:"DOLocationID"::number,
+            $1:"payment_type"::number,
+            $1:"fare_amount"::float,
+            $1:"tip_amount"::float,
+            $1:"total_amount"::float,
+            METADATA$FILENAME,
+            TO_DATE(REGEXP_SUBSTR(METADATA$FILENAME, '[0-9]{{4}}-[0-9]{{2}}') || '-01', 'YYYY-MM-DD')
+          FROM @raw_stage
+        )
           FILES = ('{fname}')
           FILE_FORMAT = (FORMAT_NAME = ff_parquet)
-          MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
     """)
     loaded = cur.execute(
-        "SELECT COUNT(*) FROM raw_yellow_tripdata "
-        "WHERE YEAR(tpep_pickup_datetime)=2023 "
-        f"AND MONTH(tpep_pickup_datetime)={int(month.split('-')[1])}"
+        "SELECT COUNT(*) FROM raw_yellow_tripdata WHERE source_file = %s", (fname,)
     ).fetchone()[0]
-    log.info("[%s] COPY complete — %s rows for this month in raw table", month, f"{loaded:,}")
+    log.info("[%s] COPY complete — %s rows from %s in raw table", month, f"{loaded:,}", fname)
 
     if not keep_local:
         os.remove(path)

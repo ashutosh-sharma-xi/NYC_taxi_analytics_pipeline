@@ -16,6 +16,7 @@ clean-targets: ["target", "dbt_packages"]
 vars:
   min_trip_duration_minutes: 1
   max_trip_duration_minutes: 180
+  trip_year: 2023            # drop rows whose pickup year isn't this (corrupt meter clocks)
 
 # Master switch for the dbt build, read from the MODELS_ENABLED environment
 # variable (default 'true'). Every model's `enabled:` in its schema.yml keys off

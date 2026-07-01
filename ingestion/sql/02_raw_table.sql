@@ -14,5 +14,8 @@ CREATE TABLE IF NOT EXISTS raw_yellow_tripdata (
   fare_amount            FLOAT,
   tip_amount             FLOAT,
   total_amount           FLOAT,
+  -- Provenance from the source file name (captured at COPY time):
+  source_file            STRING,          -- e.g. yellow_tripdata_2023-01.parquet
+  file_month             DATE,            -- first of the file's month, e.g. 2023-01-01
   _loaded_at             TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );

@@ -38,6 +38,8 @@ select
     doz.borough   as dropoff_borough,
     doz.zone_name as dropoff_zone,
 
+    t.file_month,
+    t.source_file,
     t._loaded_at
 from trips t
 left join zones puz on t.pickup_location_id  = puz.location_id
@@ -47,6 +49,10 @@ where t.trip_distance > 0
   and t.passenger_count > 0
   and t.trip_duration_minutes >= {{ var('min_trip_duration_minutes') }}
   and t.trip_duration_minutes <= {{ var('max_trip_duration_minutes') }}
+  -- Drop cross-year leakage: monthly files carry a few rows with corrupt meter
+  -- clocks (e.g. 2008, 2022). Without this, those dates pollute agg_daily_revenue
+  -- and inflate months_observed in agg_zone_performance.
+  and year(t.pickup_datetime) = {{ var('trip_year') }}
 {% if is_incremental() %}
   -- only process rows loaded since the last run (ingestion stamps _loaded_at)
   and t._loaded_at > (select max(_loaded_at) from {{ this }})

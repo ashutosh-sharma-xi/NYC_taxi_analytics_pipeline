@@ -57,13 +57,20 @@ models:
           - unique
 
   - name: agg_zone_performance
-    description: "Per pickup-zone performance with revenue rank and high-volume flag."
+    description: "Per pickup-zone, per-month performance with a within-month revenue rank and high-volume flag."
     config:
       materialized: table
       tags: ['marts']
       enabled: "{{ env_var('MODELS_ENABLED', 'true') | lower == 'true' }}"
     columns:
-      - name: pickup_location_id
+      - name: zone_month_key
+        description: "Surrogate PK for the zone x month grain."
         tests:
           - not_null
           - unique
+      - name: file_month
+        tests:
+          - not_null
+      - name: pickup_location_id
+        tests:
+          - not_null

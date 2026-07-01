@@ -32,5 +32,8 @@ select
 
     datediff('minute', tpep_pickup_datetime, tpep_dropoff_datetime)
                                                             as trip_duration_minutes,
+
+    file_month,      -- source file's month (provenance / clean monthly grain)
+    source_file,     -- source file name (lineage)
     _loaded_at
 from source
