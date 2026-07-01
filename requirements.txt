@@ -1,15 +1,12 @@
-# --- Ingestion (batch loader into Snowflake RAW) ---
+# Core pipeline — ingestion into Snowflake RAW + dbt transforms.
+# This is all `scripts/pipeline.sh` needs.
+#
+# Optional extras live in separate files (install only if you use them):
+#   requirements-airflow.txt   to run the Airflow DAG (dags/)
+#   requirements-spark.txt     for the PySpark bonus (spark/)
+#   eda/requirements.txt       for the local EDA notebook (DuckDB)
 snowflake-connector-python>=3.7.0
 python-dotenv>=1.0.0
 requests>=2.31.0
-
-# --- Transformation (dbt on Snowflake) ---
 dbt-core>=1.7.0
 dbt-snowflake>=1.7.0
-
-# --- Orchestration (Airflow) ---
-# Heavy + Linux-oriented; on Windows run Airflow via WSL or Docker.
-apache-airflow>=2.8.0
-
-# --- Bonus: Spark historical processing ---
-pyspark>=3.5.0

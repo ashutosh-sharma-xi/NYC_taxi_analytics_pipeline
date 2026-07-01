@@ -1,0 +1,51 @@
+name: Weekly dbt build
+
+# Full transform once a week: ingest (idempotent, so safe even if a daily run was
+# missed) then dbt seed + build + test. Also deploys on any change to dbt/ so model
+# edits are validated. Portable to any Snowflake account via repo Secrets.
+
+on:
+  schedule:
+    - cron: "0 7 * * 0"          # 07:00 UTC Sundays
+  push:
+    branches: [main]
+    paths: ["dbt/**"]            # validate model changes on merge
+  workflow_dispatch:
+    inputs:
+      months:
+        description: "Months to (re)ingest before building"
+        default: "2023-01"
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE || 'ACCOUNTADMIN' }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE || 'COMPUTE_WH' }}
+      SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE || 'NYC_TAXI' }}
+      RAW_SCHEMA:          ${{ secrets.RAW_SCHEMA || 'RAW' }}
+      DBT_SCHEMA:          ${{ secrets.DBT_SCHEMA || 'ANALYTICS' }}
+      SLACK_WEBHOOK_URL:   ${{ secrets.SLACK_WEBHOOK_URL }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: rsa_key.p8   # written from a secret below
+      MONTHS:              ${{ github.event.inputs.months || '2023-01' }}
+      MODELS_ENABLED: "true"
+      SKIP_INSTALL: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Write Snowflake private key
+        run: printf '%s\n' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > rsa_key.p8
+      - name: Install build deps
+        run: pip install dbt-snowflake snowflake-connector-python python-dotenv requests
+      - name: Ingest + dbt build + test
+        run: bash scripts/pipeline.sh run

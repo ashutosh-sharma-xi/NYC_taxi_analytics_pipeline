@@ -1,0 +1,4 @@
+# Airflow orchestrator (dags/) — ONLY needed if you run Airflow yourself.
+# Heavy + Linux-oriented; on Windows use WSL or Docker. Not required for the
+# GitHub Actions path (which needs nothing beyond the core requirements).
+apache-airflow>=2.8.0

@@ -76,7 +76,11 @@ def check_source_freshness(**context):
 
 
 def notify_success(**context):
-    """Log a success summary: trip count + revenue for the run date."""
+    """Report a successful run.
+
+    - Looks up the run date's trip count + revenue from agg_daily_revenue.
+    - Logs it and posts a Slack success message (with a link to the run).
+    """
     import snowflake.connector
 
     ds = context["ds"]

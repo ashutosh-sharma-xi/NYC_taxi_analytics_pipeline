@@ -1,4 +1,4 @@
--- 02 · Raw landing table. We land the columns the pipeline needs; MATCH_BY_COLUMN_NAME
+-- 02 · Raw landing table. We land the columns the pipeline needs. MATCH_BY_COLUMN_NAME
 -- on COPY ignores the extra Parquet columns (VendorID, RatecodeID, tolls, etc.).
 -- _loaded_at is populated by its DEFAULT on every COPY — this is what dbt source
 -- freshness checks against.

@@ -18,31 +18,59 @@ the same code serves a one-off 2023 batch and a recurring monthly/daily load.
 Set KEEP_LOCAL=1 to retain the downloaded Parquet under data/ (e.g. for the EDA
 notebook); by default each file is deleted after it loads.
 """
+import logging
 import os
+import time
 
 import snowflake.connector
 
-from config import get_config
+from config import get_config, connect_kwargs
 from download import download
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("ingest")
 
 SQL_DIR = os.path.join(os.path.dirname(__file__), "sql")
 
 
 def run_sql_file(cur, filename):
+    """Run every statement in a .sql file, in order.
+
+    - Removes comment lines first, so a ';' inside a comment can't split a statement.
+    - Splits on ';' and executes each statement on the open cursor.
+    """
     with open(os.path.join(SQL_DIR, filename), encoding="utf-8") as f:
-        for stmt in [s.strip() for s in f.read().split(";") if s.strip()]:
-            cur.execute(stmt)
+        raw = f.read()
+    # Drop full-line comments FIRST, so a ';' inside a comment can't split a statement.
+    sql = "\n".join(ln for ln in raw.splitlines() if not ln.strip().startswith("--"))
+    for stmt in [s.strip() for s in sql.split(";") if s.strip()]:
+        cur.execute(stmt)
+    log.info("ran sql/%s", filename)
 
 
 def load_month(cur, month, keep_local):
-    """Download one month, PUT it, COPY it, then optionally remove the local file."""
+    """Load one month of trips into the raw table.
+
+    - Downloads that month's file and uploads it to the Snowflake stage (PUT).
+    - COPYs just that file into raw_yellow_tripdata (already-loaded files are skipped).
+    - Deletes the local file afterwards unless KEEP_LOCAL is set.
+    """
     fname = f"yellow_tripdata_{month}.parquet"
-    print(f"\n--- {month} ---")
-    path = download((month,))[0]                      # stream just this month to disk
+    t0 = time.perf_counter()
+    log.info("[%s] starting", month)
+
+    path = download((month,))[0]                       # stream just this month to disk
 
     uri = "file://" + os.path.abspath(path).replace("\\", "/")
-    cur.execute(f"PUT '{uri}' @raw_stage AUTO_COMPRESS=FALSE OVERWRITE=TRUE")
-    print(f"   PUT {fname}")
+    # OVERWRITE=FALSE: re-uploading would reset the staged file's metadata and make
+    # COPY reload it (duplicates). Skipping keeps re-runs idempotent; COPY's own
+    # load history then skips files it has already ingested.
+    cur.execute(f"PUT '{uri}' @raw_stage AUTO_COMPRESS=FALSE OVERWRITE=FALSE")
+    log.info("[%s] PUT to stage complete", month)
 
     # COPY only THIS file (FILES=...). Snowflake's load history skips it on re-run.
     cur.execute(f"""
@@ -56,43 +84,53 @@ def load_month(cur, month, keep_local):
         "WHERE YEAR(tpep_pickup_datetime)=2023 "
         f"AND MONTH(tpep_pickup_datetime)={int(month.split('-')[1])}"
     ).fetchone()[0]
-    print(f"   COPY done — {loaded:,} {month} rows now in raw table")
+    log.info("[%s] COPY complete — %s rows for this month in raw table", month, f"{loaded:,}")
 
     if not keep_local:
         os.remove(path)
-        print(f"   freed local {fname}")
+        log.info("[%s] freed local file %s", month, fname)
+    log.info("[%s] done in %.1fs", month, time.perf_counter() - t0)
 
 
 def main():
+    """Run the full ingestion.
+
+    - Connects to Snowflake (key-pair or password).
+    - Makes sure the warehouse, database, schema, stage and raw table exist.
+    - Loads each month in MONTHS one at a time, then logs the total row count.
+    """
     months = [m.strip() for m in os.environ.get("MONTHS", "2023-01").split(",")]
     keep_local = os.environ.get("KEEP_LOCAL", "") not in ("", "0", "false", "False")
     cfg = get_config()
+    run_start = time.perf_counter()
 
-    print("1) Connecting to Snowflake...")
-    con = snowflake.connector.connect(
-        account=cfg["account"], user=cfg["user"], password=cfg["password"],
-        role=cfg["role"], warehouse=cfg["warehouse"],
-    )
+    auth = "key-pair" if cfg.get("private_key_path") else "password"
+    log.info("connecting to Snowflake (account=%s, user=%s, auth=%s)", cfg["account"], cfg["user"], auth)
+    con = snowflake.connector.connect(**connect_kwargs(cfg))
     cur = con.cursor()
     try:
-        print(f"2) Ensuring {cfg['database']}.{cfg['raw_schema']} ...")
+        log.info("ensuring %s.%s and warehouse %s", cfg["database"], cfg["raw_schema"], cfg["warehouse"])
         cur.execute(f"USE WAREHOUSE {cfg['warehouse']}")
         cur.execute(f"CREATE DATABASE IF NOT EXISTS {cfg['database']}")
         cur.execute(f"USE DATABASE {cfg['database']}")
         cur.execute(f"CREATE SCHEMA IF NOT EXISTS {cfg['raw_schema']}")
         cur.execute(f"USE SCHEMA {cfg['raw_schema']}")
 
-        print("3) Setup + raw table...")
+        log.info("applying setup + raw table DDL")
         run_sql_file(cur, "01_setup.sql")
         run_sql_file(cur, "02_raw_table.sql")
 
-        print(f"4) Loading {len(months)} month(s), one at a time...")
+        log.info("loading %d month(s): %s", len(months), ", ".join(months))
         for month in months:
             load_month(cur, month, keep_local)
 
         total = cur.execute("SELECT COUNT(*) FROM raw_yellow_tripdata").fetchone()[0]
-        print(f"\nDone. raw_yellow_tripdata now holds {total:,} rows.")
-        print("Next: cd dbt && dbt seed && dbt run && dbt test")
+        log.info("INGESTION COMPLETE — raw_yellow_tripdata holds %s rows (%.1fs total)",
+                 f"{total:,}", time.perf_counter() - run_start)
+        log.info("next: cd dbt && dbt seed && dbt build")
+    except Exception:
+        log.exception("ingestion FAILED")
+        raise
     finally:
         cur.close()
         con.close()

@@ -1,3 +1,8 @@
+# Secrets: Snowflake key-pair (NEVER commit private keys)
+*.p8
+*.pub
+rsa_key*
+
 # Project: downloaded data & local DuckDB warehouse
 data/
 *.duckdb
@@ -10,6 +15,10 @@ profiles.yml
 
 # Spark output
 spark_output/
+
+# Pipeline run logs
+logs/
+*.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -229,3 +238,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# dbt local user file
+dbt/.user.yml

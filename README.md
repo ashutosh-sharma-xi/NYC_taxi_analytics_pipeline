@@ -86,9 +86,14 @@ then `dbt run --full-refresh`.
 ## Bonus: Spark
 
 ```bash
+pip install -r requirements-spark.txt   # optional, ~450 MB
 python ingestion/download.py            # fetch Parquet locally first
 python spark/process_historical.py --input data --output spark_output
 ```
+
+> Airflow (`dags/`) and Spark (`spark/`) deps are **not** in the core
+> `requirements.txt` — install `requirements-airflow.txt` / `requirements-spark.txt`
+> only if you use them. The pipeline itself needs neither.
 
 ## Notes
 - TLC publishes **monthly** with a ~2-month lag — this is a batch dataset.

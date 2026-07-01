@@ -19,6 +19,7 @@ from pyspark.sql import functions as F
 
 
 def build_spark():
+    """Create a local SparkSession (UTC timezone) for the batch job."""
     return (
         SparkSession.builder
         .appName("nyc_taxi_historical")
@@ -28,6 +29,12 @@ def build_spark():
 
 
 def process(spark, input_dir, output_dir, min_minutes=1, max_minutes=180):
+    """Clean the historical Parquet and write it back out, partitioned.
+
+    - Reads all 2023 files, derives trip_duration_minutes.
+    - Applies the same data-quality filters as the dbt pipeline.
+    - Writes cleaned Parquet partitioned by pickup year/month.
+    """
     df = spark.read.parquet(f"{input_dir}/yellow_tripdata_2023-*.parquet")
 
     cleaned = (

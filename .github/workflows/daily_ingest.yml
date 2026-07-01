@@ -1,0 +1,45 @@
+name: Daily ingest
+
+# Ingest raw taxi data into Snowflake RAW every day. No dbt build here — that's
+# the weekly job. All creds come from repo Secrets, so this ports to any
+# Snowflake account by changing the secrets (no code change).
+
+on:
+  schedule:
+    - cron: "0 6 * * *"          # 06:00 UTC daily
+  workflow_dispatch:              # manual run / backfill
+    inputs:
+      months:
+        description: "Months to ingest (comma-separated, e.g. 2023-01,2023-02)"
+        default: "2023-01"
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_ACCOUNT:   ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER:      ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD:  ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE:      ${{ secrets.SNOWFLAKE_ROLE || 'ACCOUNTADMIN' }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE || 'COMPUTE_WH' }}
+      SNOWFLAKE_DATABASE:  ${{ secrets.SNOWFLAKE_DATABASE || 'NYC_TAXI' }}
+      RAW_SCHEMA:          ${{ secrets.RAW_SCHEMA || 'RAW' }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: rsa_key.p8   # written from a secret below (relative → resolved at runtime)
+      MONTHS:              ${{ github.event.inputs.months || '2023-01' }}
+      SKIP_INSTALL: "1"           # we install a slim set below, not full requirements
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Write Snowflake private key
+        run: printf '%s\n' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > rsa_key.p8
+      - name: Install ingest deps
+        run: pip install snowflake-connector-python python-dotenv requests
+      - name: Ingest
+        run: bash scripts/pipeline.sh ingest
